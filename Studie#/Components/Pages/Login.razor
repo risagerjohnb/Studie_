@@ -1,1 +1,30 @@
 ﻿@page "/login"
+
+<MudContainer Class="d-flex justify-center align-center py-12">
+    <MudCard Style="max-width: 420px; width: 100%;">
+        <MudCardContent>
+            <MudText Class="mb-2">Pick institution</MudText>
+            <MudSelect T="string" @bind-Value="_selectedInstitution" Required="true" Class="mb-4">
+                @foreach (var item in items)
+                {
+                    <MudSelectItem Value="@item">@item</MudSelectItem>
+                }
+            </MudSelect>
+            <MudStack Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true">1FA</MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true">2FA</MudButton>
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private string? _selectedInstitution;
+
+    private string[] items = new string[]
+    {
+        "Aarhus Tech",
+        "Aarhus Universitet",
+        "Aalborg Universitet"
+    };
+}
