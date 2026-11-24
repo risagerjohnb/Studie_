@@ -1,25 +1,170 @@
-﻿@page "/login"
+﻿@using Studie_.Models
+@inject UserManager<InstitutionUsers> UserManager
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+@page "/login"
 
 <MudContainer Class="d-flex justify-center align-center py-12">
-    <MudCard Style="max-width: 420px; width: 100%;">
-        <MudCardContent>
-            <MudText Class="mb-2">Pick institution</MudText>
-            <MudSelect T="string" @bind-Value="_selectedInstitution" Required="true" Class="mb-4">
-                @foreach (var item in items)
-                {
-                    <MudSelectItem Value="@item">@item</MudSelectItem>
-                }
-            </MudSelect>
-            <MudStack Spacing="2">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true">1FA</MudButton>
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true">2FA</MudButton>
-            </MudStack>
-        </MudCardContent>
-    </MudCard>
+
+    @if(_step == 1)
+    {
+        <MudCard Style="max-width: 420px; width: 100%;">
+            <MudCardContent>
+                <MudText Class="mb-2">Pick institution</MudText>
+                <MudSelect T="string" @bind-Value="_selectedInstitution" Required="true" Class="mb-4">
+                    @foreach (var item in items)
+                    {
+                        <MudSelectItem Value="@item">@item</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudStack Spacing="2">
+                    <MudButton OnClick="() => OnInstitutionSelected(_selectedRole, _selectedInstitution)" Color="Color.Primary" Variant="Variant.Filled" FullWidth="true">1FA</MudButton>
+                    <MudButton OnClick="() => OnInstitutionSelected(_selectedRole, _selectedInstitution, forceTwoFactor: true)" Color="Color.Primary" Variant="Variant.Filled" FullWidth="true">2FA</MudButton>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    }
+    else if(_step == 2)
+    {
+        <MudCard Style="max-width: 420px; width: 100%;">
+            <MudCardContent>
+                <MudButton OnClick="() => _step = 1">Go back</MudButton>
+                <MudTextField Label="Email" @bind-Value="_email" Required="true" Class="mb-4"></MudTextField>
+                <MudTextField Label="Password" @bind-Value="_password" InputType="InputType.Password" Required="true" Class="mb-4"></MudTextField>
+                <MudCheckBox @bind-Value="_rememberMe" Color="Color.Primary" Label="Remember me"></MudCheckBox>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" OnClick="VerifyCredentialsAsync">Confirm</MudButton>
+            </MudCardContent>
+        </MudCard>
+    }
+    else if (_step == 3)
+    {
+        <MudCard Style="max-width: 420px; width: 100%;">
+            <MudCardContent>
+                <MudButton OnClick="() => _step = 2">Go back</MudButton>
+                <MudText Class="mb-2">Two-Factor Authentication Required</MudText>
+                <MudTextField Label="Enter your 2FA code" @bind-Value="_twoFactorCode" Required="true" Class="mb-4"></MudTextField>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" OnClick="VerifyTwoFactorCodeAsync">Verify</MudButton>
+            </MudCardContent>
+        </MudCard>
+    }
+
 </MudContainer>
 
 @code {
-    private string? _selectedInstitution;
+    string _email = string.Empty;
+    string _password = string.Empty;
+    bool _rememberMe = false;
+
+    string? _selectedInstitution;
+    int _step = 1;
+    bool _requiresTwoFactor = false;
+    string? _selectedRole = "Student";
+
+    string? _validationMessage;
+    string? _errorMessage;
+
+    string _twoFactorCode = string.Empty;
+
+    InstitutionUsers institutionUsers = new InstitutionUsers();
+
+    private void OnInstitutionSelected(string? role, string? institution, bool forceTwoFactor = false)
+    {
+        if (string.IsNullOrWhiteSpace(institution))
+        {
+            _validationMessage = "Please pick an institution first.";
+            return;
+        }
+
+        _validationMessage = null;
+        _selectedInstitution = institution;
+        _selectedRole = string.IsNullOrWhiteSpace(role) ? "Student" : role;
+        _requiresTwoFactor = forceTwoFactor || CheckIfTwoFactorRequired(_selectedRole);
+        _step = 2;
+    }
+
+    private bool CheckIfTwoFactorRequired(string? _selectedRole)
+    {
+        if (_selectedRole == "Admin" || _selectedRole == "Teacher")
+        {
+            return true;
+        }
+        Console.WriteLine(_selectedRole);
+        return false;
+    }
+
+    private async Task VerifyCredentialsAsync()
+    {
+        _errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_password))
+        {
+            _errorMessage = "Please enter both email and password.";
+            return;
+        }
+
+        var user = await UserManager.FindByEmailAsync(_email.Trim());
+        if (user is null)
+        {
+            _errorMessage = "Invalid email or password.";
+            Snackbar.Add(_errorMessage);
+            return;
+        }
+
+        var passwordValid = await UserManager.CheckPasswordAsync(user, _password);
+        if (!passwordValid)
+        {
+            _errorMessage = "Invalid email or password.";
+            Snackbar.Add(_errorMessage);
+            return;
+        }
+
+        var institution = await DbContext.Institutions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Name == _selectedInstitution);
+
+        if (institution is null || user.InstitutionId != institution.Id)
+        {
+            _errorMessage = "This account does not belong to the selected institution.";
+            Snackbar.Add(_errorMessage);
+            return;
+        }
+
+        if (_requiresTwoFactor || await UserManager.GetTwoFactorEnabledAsync(user))
+        {
+            _step = 3;
+            return;
+        }
+
+        _errorMessage = $"Credentials valid for {user.Email} (Institution: {institution.Name}, RememberMe: {_rememberMe}). Ready for cookie sign-in!";
+        Snackbar.Add(_errorMessage);
+    }
+
+    async Task VerifyTwoFactorCodeAsync()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_twoFactorCode))
+        {
+            _errorMessage = "Please enter the 2FA code.";
+            return;
+        }
+        var user = await UserManager.FindByEmailAsync(_email.Trim());
+        if (user is null)
+        {
+            _errorMessage = "Invalid email or password.";
+            Snackbar.Add(_errorMessage);
+            return;
+        }
+        var isValid2FACode = await UserManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, _twoFactorCode);
+        if (!isValid2FACode)
+        {
+            _errorMessage = "Invalid 2FA code.";
+            Snackbar.Add(_errorMessage);
+            return;
+        }
+        _errorMessage = $"2FA verified for {user.Email}. Ready for cookie sign-in!";
+        Snackbar.Add(_errorMessage);
+    }
 
     private string[] items = new string[]
     {
