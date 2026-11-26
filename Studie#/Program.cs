@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor;
 using MudBlazor.Services;
@@ -47,6 +48,79 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<InstitutionUsers>>();
+
+    await db.Database.MigrateAsync();
+
+    var institution = await db.Institutions.FirstOrDefaultAsync();
+    if (institution is null)
+    {
+        institution = new Institutions
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "Test Institution"
+        };
+        db.Institutions.Add(institution);
+        await db.SaveChangesAsync();
+    }
+
+    var studentEmail = "student@test.dk";
+    var existingUser = await userManager.FindByEmailAsync(studentEmail);
+    if (existingUser is null)
+    {
+        var student = new InstitutionUsers
+        {
+            Id = Guid.NewGuid().ToString(),
+            UserName = studentEmail,
+            Email = studentEmail,
+            EmailConfirmed = true,
+            Name = "Test Student",
+            Role = "Student",
+            InstitutionId = institution.Id,
+            EmailNotificationsEnabled = false
+        };
+
+        var result = await userManager.CreateAsync(student, "Student123!");
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            throw new Exception($"Failed to seed test student: {errors}");
+        }
+    }
+}
+
+app.MapGet("/auth/complete-login", async (
+    [FromQuery] string userId,
+    [FromQuery] string token,
+    [FromQuery] bool rememberMe,
+    UserManager<InstitutionUsers> userManager,
+    SignInManager<InstitutionUsers> signInManager) =>
+{
+    var user = await userManager.FindByIdAsync(userId);
+    if (user is null)
+    {
+        return Results.Redirect("/login");
+    }
+
+    var isValid = await userManager.VerifyUserTokenAsync(
+        user,
+        TokenOptions.DefaultProvider,
+        "BlazorInteractiveLogin",
+        token);
+
+    if (!isValid)
+    {
+        return Results.Redirect("/login");
+    }
+
+    await signInManager.SignInAsync(user, isPersistent: rememberMe);
+
+    return Results.Redirect("/");
+});
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
 app.UseHttpsRedirection();

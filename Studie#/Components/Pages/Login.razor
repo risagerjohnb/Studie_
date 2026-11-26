@@ -2,6 +2,7 @@
 @inject UserManager<InstitutionUsers> UserManager
 @inject ApplicationDbContext DbContext
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
 @page "/login"
 
@@ -136,7 +137,14 @@
             return;
         }
 
-        _errorMessage = $"Credentials valid for {user.Email} (Institution: {institution.Name}, RememberMe: {_rememberMe}). Ready for cookie sign-in!";
+        var loginToken = await UserManager.GenerateUserTokenAsync(
+                user,
+                TokenOptions.DefaultProvider,
+                "BlazorInteractiveLogin");
+
+        var url = $"/auth/complete-login?userId={Uri.EscapeDataString(user.Id)}&token={Uri.EscapeDataString(loginToken)}&rememberMe={_rememberMe}";
+        Navigation.NavigateTo(url, forceLoad: true);
+
         Snackbar.Add(_errorMessage);
     }
 
@@ -170,6 +178,7 @@
     {
         "Aarhus Tech",
         "Aarhus Universitet",
-        "Aalborg Universitet"
+        "Aalborg Universitet",
+        "Test Institution"
     };
 }
