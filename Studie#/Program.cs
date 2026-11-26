@@ -33,11 +33,12 @@ builder.Configuration.GetConnectionString("DefaultConnection");
 //dbcontext registration
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 //identity registration
 builder.Services.AddIdentity<InstitutionUsers, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
+
+builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
 
@@ -120,6 +121,12 @@ app.MapGet("/auth/complete-login", async (
     await signInManager.SignInAsync(user, isPersistent: rememberMe);
 
     return Results.Redirect("/");
+});
+
+app.MapPost("/auth/logout", async (SignInManager<InstitutionUsers> signInManager) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.Redirect("/login");
 });
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 

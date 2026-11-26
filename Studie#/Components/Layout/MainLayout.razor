@@ -1,18 +1,43 @@
 ﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 
 <MudPopoverProvider></MudPopoverProvider>
 <MudDialogProvider></MudDialogProvider>
 <MudSnackbarProvider />
 <MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
+
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudText Typo="Typo.h5" Class="ml-3">Application</MudText>
+        <MudText Typo="Typo.h5" Class="ml-3">Studie #</MudText>
+        <MudSpacer />
+
+        <AuthorizeView>
+            <Authorized Context="authState">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mr-3">
+                    <MudText Typo="Typo.body2">@authState.User.Identity?.Name</MudText>
+                    <form method="post" action="/auth/logout">
+                        <AntiforgeryToken />
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Inherit"
+                                   Size="Size.Small">
+                            Log out
+                        </MudButton>
+                    </form>
+                </MudStack>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Href="/login"
+                           Variant="Variant.Text"
+                           Color="Color.Inherit"
+                           Class="mr-3">
+                    Log in
+                </MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
     </MudAppBar>
-    <MudDrawer id="nav-drawer" @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-        <NavMenu />
-    </MudDrawer>
     <MudMainContent Class="pt-16 pa-4">
-        @Body
+            @Body
     </MudMainContent>
 </MudLayout>
 
