@@ -1,8 +1,147 @@
 ﻿@page "/educators"
 @attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Studie_.Services
+@inject RandomUserApiClient RandomUserApiClient
 
-<h3>Educators</h3>
+<PageTitle>Educators - Studie #</PageTitle>
 
-@code {
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudStack Spacing="1" Class="mb-6">
+        <MudText Typo="Typo.h4">Educators</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary">
+            Showing only current teachers/instructors
+        </MudText>
+    </MudStack>
 
+    @if (_isLoading)
+    {
+        <MudPaper Class="pa-8" Outlined="true" Style="border-radius: 16px;">
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <MudText Color="Color.Secondary">Loading sample profiles...</MudText>
+            </MudStack>
+        </MudPaper>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">
+            @_errorMessage
+        </MudAlert>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadEducatorsAsync">
+            Try again
+        </MudButton>
+    }
+    else if (_educators.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+            The random-user service did not return any sample profiles.
+        </MudAlert>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var educator in _educators)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Outlined="true" Elevation="0" Style="height: 100%; border-radius: 16px;">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                    <MudAvatar Color="Color.Primary" Size="Size.Large">
+                                        <MudImage Src="@educator.Avatar" />
+                                    </MudAvatar>
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.h6">@(string.IsNullOrWhiteSpace(educator.Name) ? "Random user" : educator.Name)</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                            @educator.Role
+                                        </MudChip>
+                                    </MudStack>
+                                </MudStack>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent Class="pt-0">
+                            <MudDivider Class="mb-3" />
+                            <MudStack Spacing="2">
+                                @if (!string.IsNullOrWhiteSpace(educator.Email))
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Secondary" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Style="overflow-wrap: anywhere;">
+                                            @educator.Email
+                                        </MudText>
+                                    </MudStack>
+                                }
+                            </MudStack>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+    @code {
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private List<EducatorViewModel> _educators = [];
+
+    private sealed class EducatorViewModel
+    {
+        public string? Name { get; init; }
+        public string? Email { get; init; }
+        public string? Avatar { get; init; }
+        public string Role { get; init; } = string.Empty;
+    }
+
+    protected override Task OnInitializedAsync() => LoadEducatorsAsync();
+
+    private async Task LoadEducatorsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var profiles = await RandomUserApiClient.GetUsersAsync();
+            var roles = new[] { "Teacher", "Instructor" };
+            _educators = profiles
+                .Select((profile, index) => new EducatorViewModel
+                {
+                    Name = profile.Name,
+                    Email = profile.Email,
+                    Avatar = profile.Avatar,
+                    Role = roles[index % roles.Length]
+                })
+                .ToList();
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "Could not load sample profiles from API Ninjas. Check the API key and try again.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            _errorMessage = "The sample-profile service returned data the page could not read.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "?";
+        }
+
+        return string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(2)
+            .Select(part => char.ToUpperInvariant(part[0])));
+    }
 }

@@ -6,6 +6,7 @@ using MudBlazor.Services;
 using Studie_.Components;
 using Studie_.Data;
 using Studie_.Models;
+using Studie_.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,7 @@ builder.Services.AddMudServices(config =>
 
 
 // Add services to the container.
+builder.Services.AddHttpClient<RandomUserApiClient>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
