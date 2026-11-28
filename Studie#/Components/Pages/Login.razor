@@ -3,6 +3,7 @@
 @inject ApplicationDbContext DbContext
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 @page "/login"
 
@@ -69,6 +70,15 @@
 
     InstitutionUsers institutionUsers = new InstitutionUsers();
 
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authenticationState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
     private void OnInstitutionSelected(string? role, string? institution, bool forceTwoFactor = false)
     {
         if (string.IsNullOrWhiteSpace(institution))
@@ -86,7 +96,7 @@
 
     private bool CheckIfTwoFactorRequired(string? _selectedRole)
     {
-        if (_selectedRole == "Admin" || _selectedRole == "Teacher")
+        if (_selectedRole == "Admin" || _selectedRole == "Educator")
         {
             return true;
         }

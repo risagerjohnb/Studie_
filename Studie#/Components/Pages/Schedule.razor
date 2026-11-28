@@ -1,0 +1,176 @@
+﻿@page "/"
+@page "/schedule"
+@attribute [Authorize]
+@using Studie_.Models
+
+<PageTitle>Schedule - Studie #</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-6" Style="position: relative; min-height: 75vh;">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-5" Wrap="Wrap.Wrap">
+        <MudText Typo="Typo.h5">Schedule</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                       Color="Color.Primary"
+                       OnClick="@(() => ChangeWeek(-1))"
+                       aria-label="Previous week" />
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.subtitle1">Week @GetIsoWeekNumber(_selectedDate)</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @StartOfWeek(_selectedDate).ToString("d MMM") – @StartOfWeek(_selectedDate).AddDays(4).ToString("d MMM yyyy")
+            </MudText>
+        </MudStack>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                       Color="Color.Primary"
+                       OnClick="@(() => ChangeWeek(1))"
+                       aria-label="Next week" />
+        <MudSpacer />
+        <MudDatePicker Label="Go to date"
+                       Date="_selectedDate"
+                       DateChanged="OnDateChanged"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Editable="true" />
+    </MudStack>
+
+    <MudGrid Spacing="3">
+        @foreach (var day in _weekDays)
+        {
+            <MudItem xs="12" sm="6" md="3" lg="3">
+                <MudCard Outlined="true"
+                         Elevation="0"
+                         Style="border: 2px solid var(--mud-palette-text-primary); border-radius:8px; min-height: 240px;">
+                    <MudCardHeader Class="pb-2">
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h5">@day.Date.ToString("dddd")</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @day.Date.ToString("d MMM")
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+
+                    <MudCardContent Class="pt-1">
+                        @if (day.Classes.Count == 0)
+                        {
+                            <MudText Typo="Typo.body1" Color="Color.Secondary">No classes</MudText>
+                        }
+                        else
+                        {
+                            <MudStack Spacing="3">
+                                @foreach (var session in day.Classes)
+                                {
+                                    <MudPaper Elevation="0" Class="" Style="background: var(--mud-palette-background-grey); border-radius: 10px;">
+                                        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;">
+                                            <MudText Typo="Typo.h6"><strong>@session.Subject</strong></MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Primary">
+                                                <strong>@session.TimeRange</strong>
+                                            </MudText>
+                                        </div>
+                                        <MudDivider />
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            @session.Room · @session.Educator
+                                        </MudText>
+                                        @if (!string.IsNullOrWhiteSpace(session.Notes) && !string.Equals(session.Notes, "No notes", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                                                @session.Notes
+                                            </MudText>
+                                        }
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+</MudContainer>
+
+@code {
+    private DateTime _selectedDate = DateTime.Today;
+    private bool _showChatHint;
+    private List<DayScheduleColumn> _weekDays = [];
+
+    private sealed class DayScheduleColumn
+    {
+        public DateTime Date { get; set; }
+        public List<ClassSession> Classes { get; set; } = [];
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadWeek();
+    }
+
+    private void ChangeWeek(int weekOffset)
+    {
+        _selectedDate = StartOfWeek(_selectedDate).AddDays(7 * weekOffset);
+        LoadWeek();
+    }
+
+    private Task OnDateChanged(DateTime? date)
+    {
+        if (date.HasValue)
+        {
+            _selectedDate = date.Value;
+            LoadWeek();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void LoadWeek()
+    {
+        var monday = StartOfWeek(_selectedDate);
+        _weekDays = Enumerable.Range(0, 5)
+            .Select(dayOffset => new DayScheduleColumn
+            {
+                Date = monday.AddDays(dayOffset),
+                Classes = GetClassesForDay(dayOffset)
+            })
+            .ToList();
+    }
+
+    private static List<ClassSession> GetClassesForDay(int dayOffset) => dayOffset switch
+    {
+        0 =>
+        [
+            new() { TimeRange = "08:15 - 09:45", Subject = "projekt 3", Educator = "klt", Room = "AC206", Notes = "Bring your laptop." },
+            new() { TimeRange = "10:00 - 11:30", Subject = "projekt 3", Educator = "klt", Room = "AC206" },
+            new() { TimeRange = "12:15 - 13:45", Subject = "projekt 3", Educator = "klt", Room = "AC206", Notes = "Team project work." }
+        ],
+        1 =>
+        [
+            new() { TimeRange = "08:15 - 09:45", Subject = "projekt 3", Educator = "klt", Room = "AC206" },
+            new() { TimeRange = "10:00 - 11:30", Subject = "projekt 3", Educator = "klt", Room = "AC206", Notes = "Responsive layouts." },
+            new() { TimeRange = "12:15 - 13:45", Subject = "projekt 3", Educator = "klt", Room = "AC206" }
+        ],
+        2 =>
+        [
+            new() { TimeRange = "09:00 - 10:30", Subject = "projekt 3", Educator = "klt", Room = "AC206" },
+            new() { TimeRange = "10:45 - 12:15", Subject = "projekt 3", Educator = "klt", Room = "AC206", Notes = "Project check-in." }
+        ],
+        3 =>
+        [
+            new() { TimeRange = "08:15 - 09:45", Subject = "projekt 3", Educator = "klt", Room = "AC206" },
+            new() { TimeRange = "10:00 - 11:30", Subject = "projekt 3", Educator = "klt", Room = "AC206" },
+            new() { TimeRange = "12:15 - 13:45", Subject = "projekt 3", Educator = "klt", Room = "AC206" }
+        ],
+        _ =>
+        [
+            new() { TimeRange = "08:30 - 10:00", Subject = "projekt 3", Educator = "klt", Room = "AC206" },
+            new() { TimeRange = "10:15 - 11:45", Subject = "projekt 3", Educator = "klt", Room = "AC206", Notes = "Review goals and progress." }
+        ]
+    };
+
+    private static DateTime StartOfWeek(DateTime dt)
+    {
+        int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return dt.AddDays(-diff).Date;
+    }
+
+    private static int GetIsoWeekNumber(DateTime dt) =>
+        System.Globalization.ISOWeek.GetWeekOfYear(dt);
+
+    private void ToggleChatNotice() => _showChatHint = !_showChatHint;
+}
